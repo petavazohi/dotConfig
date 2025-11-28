@@ -7,3 +7,17 @@
 	email = petavazohi@gmail.com
 [pull]
 	rebase = true
+[push]
+    autoSetupRemote = true
+[color]
+    ui = auto
+[init]
+    defaultBranch = main
+[merge]
+    ff = only
+[alias]
+    sw = switch
+    st = status -sb
+    ci = commit
+    df = diff
+    lg = log --oneline --graph --decorate --all
