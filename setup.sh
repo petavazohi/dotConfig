@@ -35,15 +35,15 @@ ln -s ${base}/bash/.bashrc .
 
 
 # Oh-my-posh
-sudo apt install fontconfig
-if [ ! -x ~/.local/bin/oh-my-posh ]; then
-    if [ ! -d ~/.local/bin ]; then
-        mkdir -p ~/.local/bin
-    fi
-    curl -s https://ohmyposh.dev/install.sh | bash -s -- -d ~/.local/bin/
-fi
+# sudo apt install fontconfig
+# if [ ! -x ~/.local/bin/oh-my-posh ]; then
+#     if [ ! -d ~/.local/bin ]; then
+#         mkdir -p ~/.local/bin
+#     fi
+#     curl -s https://ohmyposh.dev/install.sh | bash -s -- -d ~/.local/bin/
+# fi
 
-ln -s ${base}/kali.omp.json .omp.json
+# ln -s ${base}/kali.omp.json .omp.json
 
 mkdir -p ~/.local/share/fonts
 cd ~/.local/share/fonts && curl -fLO https://github.com/ryanoasis/nerd-fonts/raw/HEAD/patched-fonts/DroidSansMono/DroidSansMNerdFont-Regular.otf
