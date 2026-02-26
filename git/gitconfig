@@ -14,7 +14,7 @@
 [init]
     defaultBranch = main
 [merge]
-    ff = false
+    ff = true
 [alias]
     sw = switch
     st = status -sb
