@@ -60,7 +60,7 @@
 
 
 ;; Functions
-(defadvice linum-update (before advice-linum-update activate)
+(defun linum-hl--update-current-line (&rest _)
   "Set the current line."
   (setq linum-current-line (line-number-at-pos)
         ;; It's the same algorithm that linum dynamic. I only had added one
@@ -69,6 +69,8 @@
                             (+ 1 (length
                                   (number-to-string
                                    (count-lines (point-min) (point-max))))))))
+
+(advice-add 'linum-update :before #'linum-hl--update-current-line)
 
 (defun linum-highlight-current-line-number (line-number)
   "Highlight the current line number using `linum-current-line-number-face' face."

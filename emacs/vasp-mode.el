@@ -45,15 +45,14 @@
 ;; which is the format that font-lock-defaults wants
 ;; Second, you used ' (quote) at the outermost level where you wanted ` (backquote)
 ;; you were very close
-(defvar vasp-font-lock-defaults
-  `((
-     ;; stuff between double quotes
-     ("\"\\.\\*\\?" . font-lock-string-face)
-     ;; ; = are all special elements
-     (";\\|=" . font-lock-string-face)
-     ( ,(regexp-opt vasp-incar-tags 'words) . font-lock-keyword-face)
-     ( ,(regexp-opt vasp-incar-bools 'words) . font-lock-warning-face)
-     )))
+(defvar vasp-font-lock-keywords
+  `(
+    ;; stuff between double quotes
+    ("\".*?\"" . font-lock-string-face)
+    ;; ; = are all special elements
+    (";\\|=" . font-lock-string-face)
+    ( ,(regexp-opt vasp-incar-tags 'words) . font-lock-keyword-face)
+    ( ,(regexp-opt vasp-incar-bools 'words) . font-lock-warning-face)))
 
 
 
@@ -61,9 +60,7 @@
 (define-derived-mode vasp-mode fundamental-mode "VASP inout"
   "VASP mode is a major mode for handling in/out put of VASP code"
 
-  ;; I just updated the variable to have the proper nesting (as noted above)
-  ;; and use the value directly here
-  (setq font-lock-defaults vasp-font-lock-defaults)
+  (setq-local font-lock-defaults (list vasp-font-lock-keywords nil nil))
 
   ;; when there's an override, use it
   ;; otherwise it gets the default value
@@ -72,11 +69,13 @@
   ;; (setq tab-width nil)
   ;; for comments
   
-  (setq comment-start "#")
-  (setq comment-end "\n")
+  ;; A normal comment setup avoids `comment-normalize-vars` errors.
+  (setq-local comment-start "# ")
+  (setq-local comment-start-skip "#+\\s-*")
+  (setq-local comment-end "")
   ;; (indent-line-to 0)
-  (highlight-lines-matching-regexp "band\s" 'hi-green-b)
-  (highlight-lines-matching-regexp "k-point\s" 'homoglyph)
+  (highlight-lines-matching-regexp "band\\s-" 'hi-green-b)
+  (highlight-lines-matching-regexp "k-point\\s-" 'homoglyph)
   (highlight-lines-matching-regexp "TITEL" 'hi-green)
   (highlight-lines-matching-regexp "TOTEN" 'hi-red-b)
   (highlight-lines-matching-regexp "Iteration" 'hi-aquamarine)

@@ -1,5 +1,21 @@
 ;;; init.el --- Simplified and Organized Emacs Configuration
 
+;;; Host Profile (light/full)
+(defun my/system-memory-kb ()
+  "Return total system memory in KB when available, otherwise nil."
+  (when (file-readable-p "/proc/meminfo")
+    (with-temp-buffer
+      (insert-file-contents "/proc/meminfo")
+      (when (re-search-forward "^MemTotal:[[:space:]]+\\([0-9]+\\)[[:space:]]+kB" nil t)
+        (string-to-number (match-string 1))))))
+
+(defconst my/light-profile
+  (let* ((env (getenv "EMACS_LIGHT"))
+         (mem-kb (my/system-memory-kb)))
+    (or (and env (member (downcase env) '("1" "true" "yes" "on")))
+        (and mem-kb (< mem-kb 900000))))
+  "When non-nil, use a lightweight Emacs profile for low-memory hosts.")
+
 ;; Package Management Setup
 (require 'package)
 (setq package-archives '(("melpa" . "https://melpa.org/packages/")
@@ -12,61 +28,43 @@
 
 (require 'use-package)
 (setq use-package-always-ensure t)
-
-(use-package f
-  :ensure t)
-
-
-;; Refresh package contents before installing
-(unless package-archive-contents
-  (package-refresh-contents))
+(setq use-package-always-defer t)
 
 ;; Package List
 ;; Install and configure packages with use-package
-(use-package tex
-  :defer t
-  :ensure auctex
-  :config
-  (setq TeX-auto-save t))
-(use-package auctex-latexmk
-  :after tex
-  :config
-  (auctex-latexmk-setup))
+(use-package flyspell :ensure nil :defer nil)
+(use-package markdown-mode
+  :mode ("\\.md\\'" "\\.markdown\\'"))
+(use-package org
+  :ensure nil
+  :defer t)
+(use-package rainbow-delimiters
+  :hook (prog-mode . rainbow-delimiters-mode))
+(use-package web-mode
+  :mode ("\\.html?\\'" "\\.jsx\\'" "\\.tsx?\\'"))
+(use-package windmove
+  :ensure nil
+  :defer t)
+(use-package yaml-mode
+  :mode ("\\.yml\\'" "\\.yaml\\'"))
+(use-package apache-mode
+  :mode (("\\.htaccess\\'" . apache-mode)
+         ("httpd\\.conf\\'" . apache-mode)
+         ("apache2\\.conf\\'" . apache-mode)
+         ("sites-\\(?:available\\|enabled\\)/.*\\'" . apache-mode)))
+(use-package material-theme :defer t)
+(use-package eglot :ensure nil)
 
-(use-package auctex-latexmk)
-(use-package auto-complete)
-(use-package better-defaults)
-(use-package blacken)
-(use-package company)
-(use-package company-auctex)
-(use-package company-bibtex)
-(use-package company-box)
-(use-package company-shell)
-(use-package conda)
-(use-package deferred)
-(use-package dracula-theme)
-(use-package elpy)
-(use-package epc)
-(use-package exec-path-from-shell)
-(use-package fill-column-indicator)
-(use-package flycheck)
-(use-package flycheck-grammarly)
-(use-package flyspell)
-(use-package jedi)
-(use-package latex-preview-pane)
-(use-package lsp-mode)
-(use-package markdown-mode)
-(use-package material-theme)
-(use-package numpydoc)
-(use-package org)
-(use-package py-autopep8)
-(use-package pyenv-mode)
-(use-package python-environment)
-(use-package rainbow-delimiters)
-(use-package web-mode)
-(use-package windmove)
-(use-package yaml-mode)
-(use-package yasnippet)
+(unless my/light-profile
+  (use-package tex
+    :defer nil
+    :ensure auctex
+    :config
+    (setq TeX-auto-save t))
+  (use-package auctex-latexmk
+    :after tex
+    :config
+    (auctex-latexmk-setup)))
 
 
 ;;; User Information
@@ -76,6 +74,12 @@
 ;;; Performance Tuning
 (setq gc-cons-threshold 50000000)
 (setq large-file-warning-threshold 100000000)
+(message "Emacs startup profile: %s" (if my/light-profile "light" "full"))
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (message "Init: %.2fs, GC: %d"
+                     (float-time (time-subtract after-init-time before-init-time))
+                     gcs-done)))
 
 ;;; UI Tweaks
 (tool-bar-mode -1)
@@ -87,23 +91,34 @@
 (if (>= emacs-major-version 29)
     (global-display-line-numbers-mode t)
   (global-linum-mode t))
-(load-theme 'material t)
+(condition-case nil
+    (load-theme 'material t)
+  (error
+   (load-theme 'tango-dark t)))
 
 ;;; Editing Enhancements
 (electric-pair-mode 1)
 (show-paren-mode 1)
 (global-hl-line-mode 1)
-(add-hook 'prog-mode-hook #'rainbow-delimiters-mode)
 (setq-default indent-tabs-mode nil)
 (setq-default tab-width 4)
 
 ;;; Load External Files and Mode-Specific Configurations
+(setq custom-file (expand-file-name "custom.el" user-emacs-directory))
+(load custom-file t)
 (load "~/.emacs.d/local" t)
-(load "~/.emacs.d/f90" t)
 (load "~/.emacs.d/bash" t)
-(load "~/.emacs.d/vasp-mode" t)
-(add-hook 'latex-mode-hook (lambda () (load "~/.emacs.d/latex" t)))
-(add-hook 'python-mode-hook (lambda () (load "~/.emacs.d/python" t)))
+
+(unless my/light-profile
+  (add-hook 'latex-mode-hook (lambda () (load "~/.emacs.d/latex" t)))
+  (load "~/.emacs.d/f90" t)
+  (load "~/.emacs.d/vasp-mode" t)
+  (add-to-list 'auto-mode-alist '("\\(?:^\\|/\\)[^/]*CAR\\'" . vasp-mode))
+  (dolist (vasp-file '("INCAR" "POSCAR" "POTCAR" "CONTCAR" "KPOINTS" "OUTCAR"))
+    (add-to-list 'auto-mode-alist
+                 (cons (format "\\(?:^\\|/\\)%s\\(?:\\..*\\)?\\'" vasp-file)
+                       'vasp-mode)))
+  (add-hook 'python-mode-hook (lambda () (load "~/.emacs.d/python" t))))
 
 ;;; Custom Function Definitions
 (defun comment-or-uncomment-region-or-line ()
@@ -147,10 +162,13 @@
 ;; Add more keybindings as needed...
 
 ;;; Additional Settings and Hooks
-(add-hook 'after-init-hook 'global-company-mode)
+;; Do not create backup/auto-save/lock files (no ~, #...#, or .#...).
+(setq make-backup-files nil
+      auto-save-default nil
+      create-lockfiles nil
+      auto-save-list-file-prefix nil)
+
 (add-hook 'text-mode-hook 'flyspell-mode)
 (add-hook 'prog-mode-hook 'flyspell-prog-mode)
-(add-hook 'after-init-hook 'global-flycheck-mode)
-(setq make-backup-files nil)
 
 ;;; init.el ends here

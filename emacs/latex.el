@@ -14,7 +14,7 @@
 
 (setq TeX-engine 'luatex)
 
-(eval-after-load "tex"
-  '(add-to-list 'TeX-command-list
-                '("LuaLaTeX" "%`lualatex%(mode) %t" TeX-run-TeX nil t)
-                t))
+(with-eval-after-load 'tex
+  (add-to-list 'TeX-command-list
+               '("LuaLaTeX" "%`lualatex%(mode) %t" TeX-run-TeX nil t)
+               t))

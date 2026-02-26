@@ -3,18 +3,21 @@
 
 
 ;;; Code:
-(add-hook 'python-mode-hook 'jedi:setup)
-(setq jedi:complete-on-dot t)
-(setq jedi:environment-root "jedi")
+(when (require 'jedi nil 'noerror)
+  (setq jedi:complete-on-dot t)
+  (setq jedi:environment-root "jedi")
+  (add-hook 'python-mode-hook #'jedi:setup))
 
-(require 'numpydoc)
-(define-key python-mode-map (kbd "C-S-2") 'numpydoc-generate)
-(setq numpydoc-insert-examples-block nil)
+(with-eval-after-load 'python
+  (when (require 'numpydoc nil 'noerror)
+    (setq numpydoc-insert-examples-block nil)
+    (define-key python-mode-map (kbd "C-S-2") #'numpydoc-generate)))
 
 
 ;; Enable autopep8
-(require 'py-autopep8)
-(add-hook 'elpy-mode-hook 'py-autopep8-enable-on-save)
+(when (require 'py-autopep8 nil 'noerror)
+  (with-eval-after-load 'elpy
+    (add-hook 'elpy-mode-hook #'py-autopep8-enable-on-save)))
 
 (setq compile-command "python")
 
@@ -30,4 +33,3 @@
 ;; (add-hook 'python-mode-hook 'python-lsp-mode)
 
 ;; (setq yas-triggers-in-field t)
-
