@@ -261,7 +261,15 @@ export FLASK_DEBUG=1
 export FLASK_SECRET_KEY='secret'
 export ELECTRON_OZONE_PLATFORM_HINT=wayland
 eval "$(oh-my-posh init zsh --config ~/.omp.json)"
-[ -f "/opt/intel/oneapi/setvars.sh" ] && source "/opt/intel/oneapi/setvars.sh"
+# Intel oneAPI (MPI) for interactive shells, with PATH hardening for tmux.
+if [ -f "/opt/intel/oneapi/setvars.sh" ]; then
+    source "/opt/intel/oneapi/setvars.sh" >/dev/null 2>&1
+    if [ -n "${I_MPI_ROOT:-}" ] && [ -d "${I_MPI_ROOT}/bin" ]; then
+        typeset -U path
+        path=("${I_MPI_ROOT}/bin" $path)
+        export PATH
+    fi
+fi
 # export CC=mpiicx
 # export CXX=mpiicpx
 # export FC=mpiifx
