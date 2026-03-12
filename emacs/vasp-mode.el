@@ -36,7 +36,27 @@
      ))
 
 (defvar vasp-incar-bools
-  '(".FALSE." "FALSE" ".TRUE." "TRUE"))
+  '(".FALSE." "FALSE" "False" ".TRUE." "TRUE" "True"))
+
+(defvar vasp-incar-true-bools
+  '(".TRUE." "TRUE" "True"))
+
+(defvar vasp-incar-false-bools
+  '(".FALSE." "FALSE" "False"))
+
+(defface vasp-true-bool-face
+  '((t (:foreground "green3" :weight bold)))
+  "Face for VASP true boolean values.")
+
+(defface vasp-false-bool-face
+  '((t (:foreground "red3" :weight bold)))
+  "Face for VASP false boolean values.")
+
+(defvar vasp-incar-true-regexp
+  "\\(?:\\.TRUE\\.\\|\\_<TRUE\\_>\\|\\_<True\\_>\\)")
+
+(defvar vasp-incar-false-regexp
+  "\\(?:\\.FALSE\\.\\|\\_<FALSE\\_>\\|\\_<False\\_>\\)")
 
 
 
@@ -52,7 +72,8 @@
     ;; ; = are all special elements
     (";\\|=" . font-lock-string-face)
     ( ,(regexp-opt vasp-incar-tags 'words) . font-lock-keyword-face)
-    ( ,(regexp-opt vasp-incar-bools 'words) . font-lock-warning-face)))
+    ( ,vasp-incar-true-regexp (0 'vasp-true-bool-face t))
+    ( ,vasp-incar-false-regexp (0 'vasp-false-bool-face t))))
 
 
 
