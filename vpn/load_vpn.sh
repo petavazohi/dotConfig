@@ -22,6 +22,8 @@ Examples:
 
 Notes:
   - VPN configs are read from /etc/openvpn/udp and /etc/openvpn/tcp by default.
+  - IPv6 is disabled while OpenVPN runs if it is currently enabled, then
+    restored when OpenVPN exits.
   - Country matching is case-insensitive. "us" and "US" both work.
   - City matching ignores case, spaces, hyphens, punctuation, and a trailing
     " - Virtual" marker in the .ovpn filename.
@@ -78,6 +80,40 @@ normalized() {
     value="${value% - virtual}"
     value="${value//[^[:alnum:]]/}"
     printf '%s\n' "$value"
+}
+
+sysctl_value() {
+    sysctl -n "$1" 2>/dev/null
+}
+
+disable_ipv6_if_enabled() {
+    IPV6_PREV_ALL="$(sysctl_value net.ipv6.conf.all.disable_ipv6)" || die "could not read IPv6 sysctl state"
+    IPV6_PREV_DEFAULT="$(sysctl_value net.ipv6.conf.default.disable_ipv6)" || die "could not read IPv6 sysctl state"
+
+    case "$IPV6_PREV_ALL:$IPV6_PREV_DEFAULT" in
+        0:*|*:0)
+            IPV6_CHANGED=1
+            printf 'Disabling IPv6 while VPN is active.\n' >&2
+            sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null
+            sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null
+            ;;
+        1:1)
+            IPV6_CHANGED=0
+            ;;
+        *)
+            die "unexpected IPv6 sysctl state: all=$IPV6_PREV_ALL default=$IPV6_PREV_DEFAULT"
+            ;;
+    esac
+}
+
+restore_ipv6_if_needed() {
+    if [[ "${IPV6_CHANGED:-0}" != 1 ]]; then
+        return
+    fi
+
+    printf 'Restoring IPv6.\n' >&2
+    sudo sysctl -w "net.ipv6.conf.default.disable_ipv6=$IPV6_PREV_DEFAULT" >/dev/null || true
+    sudo sysctl -w "net.ipv6.conf.all.disable_ipv6=$IPV6_PREV_ALL" >/dev/null || true
 }
 
 list_files() {
@@ -143,7 +179,7 @@ find_config() {
 
 main() {
     local dry_run=0
-    local protocol country city config
+    local protocol country city config exit_status
 
     case "${1:-}" in
         -h|--help|'')
@@ -183,12 +219,32 @@ main() {
     config="$(find_config "$protocol" "$country" "$city")"
 
     if (( dry_run )); then
+        local ipv6_dry_run_state
+        ipv6_dry_run_state="$(sysctl_value net.ipv6.conf.all.disable_ipv6):$(sysctl_value net.ipv6.conf.default.disable_ipv6)"
+
+        if [[ "$ipv6_dry_run_state" != "1:1" ]]; then
+            printf 'sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1\n'
+            printf 'sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1\n'
+        fi
         printf 'sudo openvpn --config %q --auth-user-pass %q\n' "$config" "$OPENVPN_CREDENTIALS_FILE"
+        if [[ "$ipv6_dry_run_state" != "1:1" ]]; then
+            printf 'sudo sysctl -w net.ipv6.conf.default.disable_ipv6=<previous-value>\n'
+            printf 'sudo sysctl -w net.ipv6.conf.all.disable_ipv6=<previous-value>\n'
+        fi
         exit 0
     fi
 
+    trap restore_ipv6_if_needed EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    disable_ipv6_if_enabled
+
     printf 'Starting OpenVPN with config: %s\n' "$config" >&2
-    exec sudo openvpn --config "$config" --auth-user-pass "$OPENVPN_CREDENTIALS_FILE"
+    set +e
+    sudo openvpn --config "$config" --auth-user-pass "$OPENVPN_CREDENTIALS_FILE"
+    exit_status=$?
+    set -e
+    exit "$exit_status"
 }
 
 main "$@"
