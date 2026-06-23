@@ -49,6 +49,11 @@ while [ $# -gt 0 ]; do
 done
 
 status() {
+    if [ "$1" = "section" ]; then
+        printf '\n== %s ==\n' "$2"
+        return
+    fi
+
     printf '%-10s %s\n' "$1" "$2"
 }
 
