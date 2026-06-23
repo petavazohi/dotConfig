@@ -1,0 +1,53 @@
+#compdef load_vpn.sh load_vpn
+
+_load_vpn() {
+  local -a protocols countries cities
+
+  case $CURRENT in
+    2)
+      protocols=(udp tcp --help -h --dry-run --list-countries --list-cities --list-files)
+      _describe 'argument' protocols
+      ;;
+    3)
+      case ${words[2]} in
+        --dry-run|--list-countries|--list-cities|--list-files)
+          protocols=(udp tcp)
+          _describe 'protocol' protocols
+          ;;
+        udp|tcp)
+          countries=("${(@f)$("${words[1]}" --list-countries "${words[2]}" 2>/dev/null)}")
+          _describe 'country' countries
+          ;;
+      esac
+      ;;
+    4)
+      case ${words[2]} in
+        --dry-run|--list-cities)
+          countries=("${(@f)$("${words[1]}" --list-countries "${words[3]}" 2>/dev/null)}")
+          _describe 'country' countries
+          ;;
+        udp|tcp)
+          cities=("${(@f)$("${words[1]}" --list-cities "${words[2]}" "${words[3]}" 2>/dev/null)}")
+          _describe 'city' cities
+          ;;
+      esac
+      ;;
+    *)
+      case ${words[2]} in
+        --dry-run)
+          if [[ $CURRENT -eq 5 ]]; then
+            cities=("${(@f)$("${words[1]}" --list-cities "${words[3]}" "${words[4]}" 2>/dev/null)}")
+            _describe 'city' cities
+          else
+            _message 'city'
+          fi
+          ;;
+        *)
+          _message 'city'
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_load_vpn "$@"
