@@ -217,8 +217,10 @@ install_shells() {
 
 install_vpn() {
     status "section" "vpn"
-    install_file "$base/vpn/load_vpn.sh" "$HOME/.local/bin/load_vpn.sh" 755
-    install_file "$base/vpn/_load_vpn" "$HOME/.local/share/zsh/site-functions/_load_vpn" 644
+    ensure_dir "$HOME/.local/bin"
+    ensure_dir "$HOME/.local/share/zsh/site-functions"
+    link_file "$base/vpn/load_vpn.sh" "$HOME/.local/bin/load_vpn.sh"
+    link_file "$base/vpn/_load_vpn" "$HOME/.local/share/zsh/site-functions/_load_vpn"
 }
 
 install_fonts() {

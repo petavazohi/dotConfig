@@ -15,20 +15,20 @@ Usage:
   load_vpn.sh -h|--help
 
 Examples:
-  load_vpn.sh udp US "New York"
-  load_vpn.sh tcp uk london
-  load_vpn.sh udp de berlin
-  load_vpn.sh --list-cities udp US
+  load_vpn.sh udp "United States" "New York"
+  load_vpn.sh tcp "United Kingdom" london
+  load_vpn.sh udp Germany berlin
+  load_vpn.sh --list-cities udp "United States"
 
 Notes:
   - VPN configs are read from /etc/openvpn/udp and /etc/openvpn/tcp by default.
   - IPv6 is disabled while OpenVPN runs if it is currently enabled, then
     restored when OpenVPN exits.
-  - Country matching is case-insensitive. "us" and "US" both work.
+  - Country matching is case-insensitive. Full names and two-letter codes work.
   - City matching ignores case, spaces, hyphens, punctuation, and a trailing
     " - Virtual" marker in the .ovpn filename.
-  - The city may be passed as multiple words without quotes:
-      load_vpn.sh udp US New York
+  - The country and city may be passed as multiple words without quotes:
+      load_vpn.sh udp United States New York
   - Credentials default to ~/.openvpn-credentials.
 
 Environment:
@@ -82,6 +82,119 @@ normalized() {
     printf '%s\n' "$value"
 }
 
+init_country_maps() {
+    if [[ "${COUNTRY_MAP_INITIALIZED:-0}" == 1 ]]; then
+        return
+    fi
+
+    declare -gA COUNTRY_BY_NAME=(
+        [andorra]=AD [unitedarabemirates]=AE [albania]=AL [armenia]=AM
+        [argentina]=AR [austria]=AT [australia]=AU [azerbaijan]=AZ
+        [bosniaandherzegovina]=BA [bangladesh]=BD [belgium]=BE [bulgaria]=BG
+        [bermuda]=BM [brunei]=BN [bolivia]=BO [brazil]=BR [bahamas]=BS
+        [bhutan]=BT [belize]=BZ [canada]=CA [switzerland]=CH [chile]=CL
+        [colombia]=CO [costarica]=CR [cyprus]=CY [czechrepublic]=CZ
+        [czechia]=CZ [germany]=DE [denmark]=DK [dominicanrepublic]=DO
+        [algeria]=DZ [ecuador]=EC [estonia]=EE [egypt]=EG [spain]=ES
+        [finland]=FI [france]=FR [georgia]=GE [ghana]=GH [greece]=GR
+        [guatemala]=GT [hongkong]=HK [honduras]=HN [croatia]=HR [haiti]=HT
+        [hungary]=HU [indonesia]=ID [ireland]=IE [israel]=IL [isleofman]=IM
+        [india]=IN [iceland]=IS [italy]=IT [jersey]=JE [jamaica]=JM
+        [jordan]=JO [japan]=JP [kenya]=KE [cambodia]=KH [southkorea]=KR
+        [korea]=KR [caymanislands]=KY [kazakhstan]=KZ [laos]=LA [lebanon]=LB
+        [liechtenstein]=LI [srilanka]=LK [lithuania]=LT [luxembourg]=LU
+        [latvia]=LV [morocco]=MA [monaco]=MC [moldova]=MD [montenegro]=ME
+        [northmacedonia]=MK [myanmar]=MM [mongolia]=MN [macau]=MO [macao]=MO
+        [malta]=MT [mexico]=MX [malaysia]=MY [nigeria]=NG [nicaragua]=NI
+        [netherlands]=NL [norway]=NO [nepal]=NP [newzealand]=NZ [panama]=PA
+        [peru]=PE [papuanewguinea]=PG [philippines]=PH [pakistan]=PK
+        [poland]=PL [puertorico]=PR [portugal]=PT [paraguay]=PY [romania]=RO
+        [serbia]=RS [saudiarabia]=SA [sweden]=SE [singapore]=SG [slovenia]=SI
+        [slovakia]=SK [thailand]=TH [turkey]=TR [trinidadandtobago]=TT
+        [taiwan]=TW [ukraine]=UA [unitedkingdom]=UK [greatbritain]=UK
+        [britain]=UK [england]=UK [unitedstates]=US [unitedstatesofamerica]=US
+        [usa]=US [venezuela]=VE [vietnam]=VN [southafrica]=ZA
+    )
+
+    declare -gA COUNTRY_NAME_BY_CODE=(
+        [AD]="Andorra" [AE]="United Arab Emirates" [AL]="Albania" [AM]="Armenia"
+        [AR]="Argentina" [AT]="Austria" [AU]="Australia" [AZ]="Azerbaijan"
+        [BA]="Bosnia and Herzegovina" [BD]="Bangladesh" [BE]="Belgium" [BG]="Bulgaria"
+        [BM]="Bermuda" [BN]="Brunei" [BO]="Bolivia" [BR]="Brazil" [BS]="Bahamas"
+        [BT]="Bhutan" [BZ]="Belize" [CA]="Canada" [CH]="Switzerland" [CL]="Chile"
+        [CO]="Colombia" [CR]="Costa Rica" [CY]="Cyprus" [CZ]="Czechia" [DE]="Germany"
+        [DK]="Denmark" [DO]="Dominican Republic" [DZ]="Algeria" [EC]="Ecuador"
+        [EE]="Estonia" [EG]="Egypt" [ES]="Spain" [FI]="Finland" [FR]="France"
+        [GE]="Georgia" [GH]="Ghana" [GR]="Greece" [GT]="Guatemala" [HK]="Hong Kong"
+        [HN]="Honduras" [HR]="Croatia" [HT]="Haiti" [HU]="Hungary" [ID]="Indonesia"
+        [IE]="Ireland" [IL]="Israel" [IM]="Isle of Man" [IN]="India" [IS]="Iceland"
+        [IT]="Italy" [JE]="Jersey" [JM]="Jamaica" [JO]="Jordan" [JP]="Japan"
+        [KE]="Kenya" [KH]="Cambodia" [KR]="South Korea" [KY]="Cayman Islands"
+        [KZ]="Kazakhstan" [LA]="Laos" [LB]="Lebanon" [LI]="Liechtenstein"
+        [LK]="Sri Lanka" [LT]="Lithuania" [LU]="Luxembourg" [LV]="Latvia"
+        [MA]="Morocco" [MC]="Monaco" [MD]="Moldova" [ME]="Montenegro"
+        [MK]="North Macedonia" [MM]="Myanmar" [MN]="Mongolia" [MO]="Macau"
+        [MT]="Malta" [MX]="Mexico" [MY]="Malaysia" [NG]="Nigeria" [NI]="Nicaragua"
+        [NL]="Netherlands" [NO]="Norway" [NP]="Nepal" [NZ]="New Zealand"
+        [PA]="Panama" [PE]="Peru" [PG]="Papua New Guinea" [PH]="Philippines"
+        [PK]="Pakistan" [PL]="Poland" [PR]="Puerto Rico" [PT]="Portugal"
+        [PY]="Paraguay" [RO]="Romania" [RS]="Serbia" [SA]="Saudi Arabia"
+        [SE]="Sweden" [SG]="Singapore" [SI]="Slovenia" [SK]="Slovakia"
+        [TH]="Thailand" [TR]="Turkey" [TT]="Trinidad and Tobago" [TW]="Taiwan"
+        [UA]="Ukraine" [UK]="United Kingdom" [US]="United States" [UY]="Uruguay"
+        [VE]="Venezuela" [VN]="Vietnam" [ZA]="South Africa"
+    )
+
+    COUNTRY_MAP_INITIALIZED=1
+}
+
+country_code() {
+    local input="$*"
+    local key code
+
+    init_country_maps
+    key="$(normalized "$input")"
+
+    if [[ -n "${COUNTRY_BY_NAME[$key]+x}" ]]; then
+        printf '%s\n' "${COUNTRY_BY_NAME[$key]}"
+        return 0
+    fi
+
+    code="${key^^}"
+    if [[ "$code" =~ ^[A-Z]{2}$ ]]; then
+        printf '%s\n' "$code"
+        return 0
+    fi
+
+    return 1
+}
+
+country_name() {
+    local code="${1^^}"
+
+    init_country_maps
+    printf '%s\n' "${COUNTRY_NAME_BY_CODE[$code]:-$code}"
+}
+
+parse_country_and_city() {
+    local -n country_out="$1"
+    local -n city_out="$2"
+    shift 2
+
+    local end candidate code
+    for ((end=$#; end>=1; end--)); do
+        candidate="${*:1:end}"
+        if code="$(country_code "$candidate")"; then
+            country_out="$code"
+            city_out="${*:end+1}"
+            [[ -n "$city_out" ]] || die "city is required"
+            return 0
+        fi
+    done
+
+    die "unknown country: $*"
+}
+
 sysctl_value() {
     sysctl -n "$1" 2>/dev/null
 }
@@ -124,16 +237,19 @@ list_files() {
 }
 
 list_countries() {
-    local file
+    local file country city proto path
     while IFS= read -r file; do
-        file_parts "$file" | awk -F '\t' '{print $1}'
+        IFS=$'\t' read -r country city proto path < <(file_parts "$file") || continue
+        country_name "$country"
     done < <(list_files "$1") | sort -u
 }
 
 list_cities() {
     local protocol="$1"
-    local wanted_country="${2^^}"
+    local wanted_country
     local file country city proto path
+
+    wanted_country="$(country_code "${*:2}")" || die "unknown country: ${*:2}"
 
     while IFS= read -r file; do
         IFS=$'\t' read -r country city proto path < <(file_parts "$file") || continue
@@ -144,7 +260,7 @@ list_cities() {
 
 find_config() {
     local protocol="$1"
-    local wanted_country="${2^^}"
+    local wanted_country="$2"
     local wanted_city_norm
     local file country city proto path city_norm
     local -a matches=()
@@ -161,8 +277,8 @@ find_config() {
 
     case "${#matches[@]}" in
         0)
-            printf 'No matching VPN config for %s %s %s.\n' "$protocol" "$wanted_country" "$3" >&2
-            printf 'Available cities for %s %s:\n' "$protocol" "$wanted_country" >&2
+            printf 'No matching VPN config for %s %s %s.\n' "$protocol" "$(country_name "$wanted_country")" "$3" >&2
+            printf 'Available cities for %s %s:\n' "$protocol" "$(country_name "$wanted_country")" >&2
             list_cities "$protocol" "$wanted_country" >&2 || true
             exit 1
             ;;
@@ -197,8 +313,8 @@ main() {
             exit 0
             ;;
         --list-cities)
-            [[ $# -eq 3 ]] || die "usage: load_vpn.sh --list-cities <udp|tcp> <country>"
-            list_cities "$2" "$3"
+            [[ $# -ge 3 ]] || die "usage: load_vpn.sh --list-cities <udp|tcp> <country>"
+            list_cities "$2" "${@:3}"
             exit 0
             ;;
         --dry-run)
@@ -210,9 +326,8 @@ main() {
     [[ $# -ge 3 ]] || die "usage: load_vpn.sh <udp|tcp> <country> <city>"
 
     protocol="${1,,}"
-    country="$2"
-    shift 2
-    city="$*"
+    shift
+    parse_country_and_city country city "$@"
 
     [[ -r "$OPENVPN_CREDENTIALS_FILE" ]] || die "credentials file not readable: $OPENVPN_CREDENTIALS_FILE"
 
