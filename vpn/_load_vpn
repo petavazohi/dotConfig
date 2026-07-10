@@ -5,12 +5,19 @@ _load_vpn() {
 
   case $CURRENT in
     2)
-      protocols=(udp tcp --help -h --dry-run --list-countries --list-cities --list-files)
+      protocols=(udp tcp --help -h --dry-run --mssfix --list-countries --list-cities --list-files)
       _describe 'argument' protocols
       ;;
     3)
       case ${words[2]} in
-        --dry-run|--list-countries|--list-cities|--list-files)
+        --mssfix)
+          _message 'mssfix value'
+          ;;
+        --dry-run)
+          protocols=(udp tcp --mssfix)
+          _describe 'protocol' protocols
+          ;;
+        --list-countries|--list-cities|--list-files)
           protocols=(udp tcp)
           _describe 'protocol' protocols
           ;;
@@ -22,7 +29,19 @@ _load_vpn() {
       ;;
     4)
       case ${words[2]} in
-        --dry-run|--list-cities)
+        --mssfix)
+          protocols=(udp tcp)
+          _describe 'protocol' protocols
+          ;;
+        --dry-run)
+          if [[ ${words[3]} == --mssfix ]]; then
+            _message 'mssfix value'
+          else
+            countries=("${(@f)$("${words[1]}" --list-countries "${words[3]}" 2>/dev/null)}")
+            _describe 'country' countries
+          fi
+          ;;
+        --list-cities)
           countries=("${(@f)$("${words[1]}" --list-countries "${words[3]}" 2>/dev/null)}")
           _describe 'country' countries
           ;;
@@ -34,8 +53,41 @@ _load_vpn() {
       ;;
     *)
       case ${words[2]} in
+        --mssfix)
+          case $CURRENT in
+            5)
+              countries=("${(@f)$("${words[1]}" --list-countries "${words[4]}" 2>/dev/null)}")
+              _describe 'country' countries
+              ;;
+            6)
+              cities=("${(@f)$("${words[1]}" --list-cities "${words[4]}" "${words[5]}" 2>/dev/null)}")
+              _describe 'city' cities
+              ;;
+            *)
+              _message 'city'
+              ;;
+          esac
+          ;;
         --dry-run)
-          if [[ $CURRENT -eq 5 ]]; then
+          if [[ ${words[3]} == --mssfix ]]; then
+            case $CURRENT in
+              5)
+                protocols=(udp tcp)
+                _describe 'protocol' protocols
+                ;;
+              6)
+                countries=("${(@f)$("${words[1]}" --list-countries "${words[5]}" 2>/dev/null)}")
+                _describe 'country' countries
+                ;;
+              7)
+                cities=("${(@f)$("${words[1]}" --list-cities "${words[5]}" "${words[6]}" 2>/dev/null)}")
+                _describe 'city' cities
+                ;;
+              *)
+                _message 'city'
+                ;;
+            esac
+          elif [[ $CURRENT -eq 5 ]]; then
             cities=("${(@f)$("${words[1]}" --list-cities "${words[3]}" "${words[4]}" 2>/dev/null)}")
             _describe 'city' cities
           else

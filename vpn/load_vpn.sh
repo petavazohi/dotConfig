@@ -7,15 +7,16 @@ OPENVPN_CREDENTIALS_FILE="${OPENVPN_CREDENTIALS_FILE:-${OPENVPN_CREDS:-$HOME/.op
 usage() {
     cat <<'EOF'
 Usage:
-  load_vpn.sh <udp|tcp> <country> <city>
+  load_vpn.sh [--mssfix <value>] <udp|tcp> <country> <city>
   load_vpn.sh --list-countries <udp|tcp>
   load_vpn.sh --list-cities <udp|tcp> <country>
   load_vpn.sh --list-files <udp|tcp>
-  load_vpn.sh --dry-run <udp|tcp> <country> <city>
+  load_vpn.sh --dry-run [--mssfix <value>] <udp|tcp> <country> <city>
   load_vpn.sh -h|--help
 
 Examples:
   load_vpn.sh udp "United States" "New York"
+  load_vpn.sh --mssfix 1380 udp "United States" "New York"
   load_vpn.sh tcp "United Kingdom" london
   load_vpn.sh udp Germany berlin
   load_vpn.sh --list-cities udp "United States"
@@ -30,6 +31,8 @@ Notes:
   - The country and city may be passed as multiple words without quotes:
       load_vpn.sh udp United States New York
   - Credentials default to ~/.openvpn-credentials.
+  - UDP connections pass --mssfix 1400 to OpenVPN by default. TCP connections
+    do not pass --mssfix unless --mssfix is provided.
 
 Environment:
   OPENVPN_CONFIG_DIR          Override the OpenVPN base directory.
@@ -293,12 +296,53 @@ find_config() {
     esac
 }
 
+validate_mssfix() {
+    local value="$1"
+    [[ "$value" =~ ^[0-9]+$ ]] || die "--mssfix must be a positive integer"
+    (( value > 0 )) || die "--mssfix must be a positive integer"
+}
+
+print_command() {
+    local -a command=("$@")
+    printf '%q' "${command[0]}"
+    printf ' %q' "${command[@]:1}"
+    printf '\n'
+}
+
 main() {
     local dry_run=0
-    local protocol country city config exit_status
+    local protocol country city config exit_status mssfix=''
+    local -a openvpn_command=()
+
+    while (($#)); do
+        case "$1" in
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            --dry-run)
+                dry_run=1
+                shift
+                ;;
+            --mssfix)
+                [[ $# -ge 2 ]] || die "usage: load_vpn.sh --mssfix <value> <udp|tcp> <country> <city>"
+                validate_mssfix "$2"
+                mssfix="$2"
+                shift 2
+                ;;
+            --mssfix=*)
+                mssfix="${1#--mssfix=}"
+                validate_mssfix "$mssfix"
+                shift
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
 
     case "${1:-}" in
-        -h|--help|'')
+        '')
             usage
             exit 0
             ;;
@@ -317,10 +361,6 @@ main() {
             list_cities "$2" "${@:3}"
             exit 0
             ;;
-        --dry-run)
-            dry_run=1
-            shift
-            ;;
     esac
 
     [[ $# -ge 3 ]] || die "usage: load_vpn.sh <udp|tcp> <country> <city>"
@@ -332,6 +372,14 @@ main() {
     [[ -r "$OPENVPN_CREDENTIALS_FILE" ]] || die "credentials file not readable: $OPENVPN_CREDENTIALS_FILE"
 
     config="$(find_config "$protocol" "$country" "$city")"
+    if [[ -z "$mssfix" && "$protocol" == udp ]]; then
+        mssfix=1400
+    fi
+
+    openvpn_command=(sudo openvpn --config "$config" --auth-user-pass "$OPENVPN_CREDENTIALS_FILE")
+    if [[ -n "$mssfix" ]]; then
+        openvpn_command+=(--mssfix "$mssfix")
+    fi
 
     if (( dry_run )); then
         local ipv6_dry_run_state
@@ -341,7 +389,7 @@ main() {
             printf 'sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1\n'
             printf 'sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1\n'
         fi
-        printf 'sudo openvpn --config %q --auth-user-pass %q\n' "$config" "$OPENVPN_CREDENTIALS_FILE"
+        print_command "${openvpn_command[@]}"
         if [[ "$ipv6_dry_run_state" != "1:1" ]]; then
             printf 'sudo sysctl -w net.ipv6.conf.default.disable_ipv6=<previous-value>\n'
             printf 'sudo sysctl -w net.ipv6.conf.all.disable_ipv6=<previous-value>\n'
@@ -356,7 +404,7 @@ main() {
 
     printf 'Starting OpenVPN with config: %s\n' "$config" >&2
     set +e
-    sudo openvpn --config "$config" --auth-user-pass "$OPENVPN_CREDENTIALS_FILE"
+    "${openvpn_command[@]}"
     exit_status=$?
     set -e
     exit "$exit_status"
